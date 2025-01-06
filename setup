@@ -1,0 +1,481 @@
+#!/bin/bash
+
+#
+# Author: ["CnSiva <sivacn@btclabs.cloud>"]
+#
+#
+# This is the bash script, which makes the necessary following component setups
+# in the environment as listed below
+#
+#   1. custom python compilation
+#   4. installing specific python pip client
+#   5. installing the required zc.buildout version
+#
+#
+#
+# Usage:
+#   ./install_build.sh
+#
+
+#
+# Ansi color code variables
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+MAGENTA="\e[35m"
+CYAN="\e[36m"
+RESET="\e[0m"
+
+BOLD="\e[1m"
+
+
+printf "${BLUE}${BOLD}"
+printf "\n\n"
+printf  "             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┏━┓┏━┓${BLUE}━━━━━━━━${RED}┏━━┓${BLUE}━━━━━━━${RED}┏┓${BLUE}━━━${RED}┏┓${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┃┃┗┛┃┃${BLUE}━━━━━━━━${RED}┃┏┓┃${BLUE}━━━━━━━${RED}┃┃${BLUE}━━━${RED}┃┃${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┃┏┓┏┓┃┏━┓${BLUE}━━━━━${RED}┃┗┛┗┓┏┓┏┓┏┓┃┃${BLUE}━${RED}┏━┛┃${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┃┃┃┃┃┃┃┏┛${BLUE}━━━━━${RED}┃┏━┓┃┃┃┃┃┣┫┃┃${BLUE}━${RED}┃┏┓┃${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┃┃┃┃┃┃┃┃${BLUE}━${RED}┏┓${BLUE}━━━${RED}┃┗━┛┃┃┗┛┃┃┃┃┗┓┃┗┛┃${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━${RED}┗┛┗┛┗┛┗┛${BLUE}━${RED}┗┛${BLUE}━━━${RED}┗━━━┛┗━━┛┗┛┗━┛┗━━┛${BLUE}━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     \n"
+printf  "             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ${RED}BUILD & DEPLOY${BLUE} ━     \n"
+printf  "             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     \n"
+printf "\n\n"
+printf "${RESET}"
+
+
+DEV_MODE=false
+POETRY_MODE=install
+RE_INSTALL_PYTHON=false
+DISPLAY_HELP=false
+
+#
+# Console arguments
+while getopts durhs option
+    do
+        case "${option}"
+        in
+            d) DEV_MODE='true';;
+            u) POETRY_MODE='update';;
+            r) RE_INSTALL_PYTHON='true';;
+            h) DISPLAY_HELP='true';;
+            *) DISPLAY_HELP='true';;
+        esac
+    done
+
+HELP_TEXT="
+
+This Script installs or updates the environment with all the necessary tools
+
+Usage
+    $ cd /path/to/basebuild
+    $ ./install_build.sh [Options]
+
+Options:
+
+    CAUTION: These options might overwrite the local changes
+
+    -r Re-Install the environment forcefully (Removes all tools including Python)
+    -d Sets up the developer oriented environment, which has single source
+    -u Updates Python Third party packages as per the pyprooject.toml file configurations
+    -s Cleans up all the sources
+    -h Display this help message
+
+"
+
+
+if [ "$DISPLAY_HELP" = "true" ]; then
+    printf "${GREEN}${BOLD}${HELP_TEXT}${RESET}"
+    exit
+fi
+
+# Error handler to stop script on failure and show the error
+error_handler() {
+    echo -e "\n\n{RED}{BOLD}ERROR: Command failed at line $1.{RESET}"
+    exit 1
+}
+
+# Enable error handling: any command that returns a non-zero exit code stops the script
+set -e
+
+
+PYTHON_EXE=bin/python3.12
+PYTHON_NAME=Python
+PYTHON_VERSION=3.12.8
+PYTHON_DIR=$PYTHON_NAME-${PYTHON_VERSION}
+PYTHON_TAR=${PYTHON_DIR}.tar.xz
+PYTHON_SOURCE_PATH="https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz"
+
+AWS_CLI=aws
+AWS_CLI_DIR=awscli
+AWS_CLI_INSTALL_DIR=local/${AWS_CLI_DIR}
+AWS_CLI_EXE=bin/${AWS_CLI}
+AWS_CLI_VERSION=v2
+AWS_CLI_RELEASE_VERSION=2.4.5
+
+
+AWS_DIR=aws
+AWS_CLI_ZIP=awscli.zip
+AWS_BIN_DIR=${HOME_DIR}/bin
+AWS_EXE=${AWS_BIN_DIR}/aws
+AWS_SOURCE_PATH=https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+
+HOME_DIR=`pwd`
+DEP_DIR=${HOME_DIR}/deps
+MODULE_BUILD_DIR=${HOME_DIR}/microservices
+
+ALL_BUILDS="tools_build user_service"
+
+LOG_FILE=${HOME_DIR}/.setup.log
+rm -f ${LOG_FILE}
+touch ${LOG_FILE}
+echo "\n\nExecuted On: `date`" >> ${LOG_FILE}
+echo "-----------------------------------------------------------\n" >> ${LOG_FILE}
+
+
+# Function to format seconds into hh:mm:ss
+format_time_mm_ss() {
+    local total_seconds=$1
+    printf "%02dm %02ds\n" $(( (total_seconds % 3600) / 60 )) $((total_seconds % 60))
+}
+
+format_time_hh_mm_ss() {
+    local total_seconds=$1
+    printf "%02dh %02dm %02ds\n" $((total_seconds / 3600)) $(( (total_seconds % 3600) / 60 )) $((total_seconds % 60))
+}
+
+#
+spinner() {
+    local pid=$!
+    local delay=0.2
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local start=$(date +%s)
+
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        # Loop through each character in spinstr
+        for i in $(seq 0 9); do
+            local char="${spinstr:$i:1}"
+
+            local end=$(date +%s)
+            local runtime=$((end-start))
+
+            # Move cursor back to the line begining
+            echo -en "\033[2K\r    ➤ ${MAGENTA}[${RED}${BOLD} $char ${MAGENTA}] ${MAGENTA}(${RED}${BOLD}$(format_time_mm_ss $runtime)${MAGENTA})${MAGENTA}${BOLD} $1 ${RESET}"
+
+            sleep $delay
+        done
+    done
+
+    local end=$(date +%s)
+    local runtime=$((end-start))
+
+    echo -en "\033[2K\r    ➤ ${MAGENTA}[${BLUE}${BOLD} ✔ ${MAGENTA}] ${MAGENTA}(${BLUE}${BOLD}$(format_time_mm_ss $runtime)${MAGENTA})${MAGENTA}${BOLD} $1 ${RESET}\n"
+
+}
+
+
+cd_home() {
+    cd ${HOME_DIR}
+}
+
+rm_dir_if_exists() {
+    CMD="rm -rf $1"
+    execute_cmd "${CMD}" "Removing the directory ${RED}$1${RESET}"
+}
+
+execute_cmd() {
+
+    if [ ! -z "$2" ]; then
+        SPINNER_TEXT=$2
+    else
+        SPINNER_TEXT="Processing Please Wait"
+        SPINNER_TEXT=$2
+    fi
+
+    if eval $1 >> ${LOG_FILE} 2>&1 & spinner "${SPINNER_TEXT}"; then
+        :
+    else
+        exit
+    fi
+
+}
+
+
+install_python() {
+
+    rm_dir_if_exists ${DEP_DIR}/${PYTHON_DIR}
+
+    if [ ! -f "${HOME_DIR}/${PYTHON_EXE}" ]; then
+
+        CMD="wget $PYTHON_SOURCE_PATH -O deps/$PYTHON_TAR"
+        execute_cmd "${CMD}" "Downloading Python-${PYTHON_VERSION}"
+
+        CMD="tar -xJf ${DEP_DIR}/${PYTHON_TAR} --directory=${DEP_DIR}"
+        execute_cmd "${CMD}" "Extracting Python-${PYTHON_VERSION}"
+
+        cd ${DEP_DIR}/${PYTHON_DIR}
+
+        CMD="./configure --prefix=`pwd`/../../ --enable-optimizations --with-lto --with-ensurepip=install"
+        execute_cmd "${CMD}" "Configuring"
+
+        N_PROC=$(nproc)
+        CMD="make -j ${N_PROC}"
+	execute_cmd "${CMD}" "Compiling ${RED}(Threads: ${N_PROC})${RESET}"
+
+        CMD="make install"
+        execute_cmd "${CMD}" "Installing"
+
+    else
+        execute_cmd "" "Python installation exists. Using the same one"
+
+    fi
+
+    cd_home
+
+    rm_dir_if_exists ${DEP_DIR}/${PYTHON_DIR}
+
+    #
+    # Upgrading pip version to latest one
+    CMD="${HOME_DIR}/${PYTHON_EXE} -m pip install --upgrade pip"
+    execute_cmd "${CMD}" "Upgrading pip to latest version"
+
+    CMD="${HOME_DIR}/${PYTHON_EXE} -m pip install --upgrade setuptools"
+    execute_cmd "${CMD}" "Installing latest setuptools"
+}
+
+
+install_aws_cli() {
+
+    execute_cmd "rm -rf ${DEP_DIR}/aws" "Removing directory aws"
+    execute_cmd "rm -rf ${DEP_DIR}/awscli*.zip" "Removing awscli*.zip"
+
+    if [ -f "${HOME_DIR}/${AWS_CLI_EXE}" ]; then
+        execute_cmd "${CMD}" "AWS-CLI library: Already exists !"
+
+    else
+        CMD="wget ${AWS_SOURCE_PATH} -O ${DEP_DIR}/${AWS_CLI_ZIP}"
+        execute_cmd "${CMD}" "AWS-CLI library: Downloading"
+
+        CMD="unzip ${DEP_DIR}/${AWS_CLI_ZIP} -d ${DEP_DIR}"
+        execute_cmd "${CMD}" "AWS-CLI library: Extracting"
+
+        CMD="${DEP_DIR}/aws/install -i ${HOME_DIR}/local/aws-cli -b ${HOME_DIR}/bin --update"
+        execute_cmd "${CMD}" "AWS-CLI library: Installing"
+    fi
+
+    cd_home
+}
+
+
+create_poetry_env_script() {
+echo "#!/bin/bash
+#
+# Poetry Related Settings and Installations
+export POETRY_CACHE_DIR=$HOME_DIR
+export POETRY_VIRTUALENVS_CREATE=false
+export POETRY_VIRTUALENVS_IN_PROJECT=false
+export POETRY_VIRTUALENVS_PATH=$HOME_DIR" > ${HOME_DIR}/bin/poetry_environ.sh
+}
+
+
+install_python_third_party_packages() {
+
+    test_poetry_environ() {
+
+        if [ -z ${POETRY_CACHE_DIR+x} ]; then
+            #
+            # Test if the Variable is set or not
+            exit 1
+        fi
+
+    }
+
+    #
+    # Install latest stable poetry version
+    CMD="${HOME_DIR}/${PYTHON_EXE} -m pip install poetry"
+    execute_cmd "${CMD}" "Installing Python Poetry"
+
+    execute_cmd create_poetry_env_script "Creating Poetry Environment Script"
+
+    . ${HOME_DIR}/bin/poetry_environ.sh
+
+    execute_cmd test_poetry_environ "Testing Poetry environment Variables"
+
+    printf "\n\n"
+
+    $HOME_DIR/bin/poetry env use $HOME_DIR/${PYTHON_EXE}
+
+    if [ "$POETRY_MODE" = "install" ]; then
+        $HOME_DIR/bin/poetry install --no-root
+    else
+        $HOME_DIR/bin/poetry update
+    fi
+
+}
+
+
+python_custom_setups() {
+
+    # CMD="$HOME_DIR/bin/python3.11 -c \"import nltk; nltk.download('wordnet'); nltk.download('stopwords');\""
+    # execute_cmd "${CMD}" "Setting up NLTK dependencies"
+
+    printf "\n"
+}
+
+
+pre_build_setups() {
+
+    if [ -d "${HOME_DIR}/local" ]; then
+        execute_cmd "" "Directory Exixts ${RED}./local${RESET}"
+    else
+        execute_cmd "mkdir -p local" "Created Directory ${RED}./local${RESET}"
+    fi
+
+    if [ -d "${HOME_DIR}/var/log" ]; then
+        execute_cmd "" "Directory Exixts ${RED}./var/log/${RESET}"
+    else
+        execute_cmd "mkdir -p var/log" "Created Directory ${RED}./var/log/${RESET}"
+    fi
+
+    if [ -d "${DEP_DIR}" ]; then
+        execute_cmd "rm -rf ${DEP_DIR}/*" "Cleaning Up ${RED}${DEP_DIR}${RESET}"
+    else
+        execute_cmd "mkdir -p ${DEP_DIR}" "Created Directory ${RED}${DEP_DIR}${RESET}"
+    fi
+
+}
+
+create_build_executable_script() {
+echo '#!/bin/bash
+#
+../../bin/py ../../scripts/deploy.py "$@"
+' > ${HOME_DIR}/bin/deploy
+
+CMD="chmod +x ${HOME_DIR}/bin/deploy"
+execute_cmd "${CMD}" "Creating build executable for modules ${RED}(./bin/deploy)${RESET}"
+}
+
+
+post_build_setups() {
+
+    setup_dedicated_src_layout() {
+
+        printf "${ALL_BUILDS}"
+        for each_build in ${ALL_BUILDS};
+            do
+                if [ ! -d ${MODULE_BUILD_DIR}/${each_build}/src ]; then
+                    mkdir -p ${MODULE_BUILD_DIR}/${each_build}/src;
+                fi
+            done
+
+    }
+
+    CMD="ln -sf ${HOME_DIR}/${PYTHON_EXE} ${HOME_DIR}/bin/py"
+    execute_cmd "${CMD}" "Creating proxy for Python Executable ${RED}(./bin/py)${RESET}"
+
+    create_build_executable_script
+
+    if [ "$DEV_MODE" = "true" ]; then
+        #
+        # NOTE: RECOMMENDED ONLY FOR THE DEVELOPER INSTANCES
+        #
+        # Set up the hybrid src layout only when for the developer instances
+        MAIN_SRC_DIR=${MODULE_BUILD_DIR}/src
+
+        if [ ! -d ${MAIN_SRC_DIR} ]; then
+            execute_cmd "mkdir -p ${MAIN_SRC_DIR}" "Creating common src directory ${RED}(./microservices/src)${RESET}"
+        else
+            execute_cmd "" "Common src directory exists ${RED}(./microservices/src)${RESET}"
+        fi
+
+        for each_build in ${ALL_BUILDS};
+            do
+                cd ${MODULE_BUILD_DIR}/${each_build};
+                rm -rf src;
+                ln -sf ../src src;
+                execute_cmd "" "Setting up src layout for '${each_build}' ${RED}(src -> ../src)${RESET}"
+            done
+
+    else
+        #
+        # Set up the dedicated src layout - This is recommened for the production environments
+        execute_cmd setup_dedicated_src_layout "Initializing dedicated sources environment"
+    fi
+
+    cd_home
+
+}
+
+
+reinstall_python() {
+
+    printf "\t${RED}${BOLD}You have opted to reinstall Python environment. [cannot be reversed]\n\t"
+    read -p "Please Confirm [y/n]: " RE_INSTALL_PYTHON_CONFIRMED
+    printf "${RESET}"
+
+    if [ "$RE_INSTALL_PYTHON_CONFIRMED" = "y" ]; then
+
+        for directory in bin lib share cache include artifacts var local;
+            #
+            # Cleanup at basebuild level
+            do
+                rm_dir_if_exists ${HOME_DIR}/$directory;
+            done
+
+        for module in ${ALL_BUILDS};
+            #
+            # Cleanup at Module build level
+            do
+                for directory in bin eggs parts develop-eggs;
+                    do
+                        rm_dir_if_exists ${HOME_DIR}/microservices/$module/$directory;
+                    done
+            done
+    elif [ "$RE_INSTALL_PYTHON_CONFIRMED" = "n" ]; then
+        :
+    else
+        printf "\n\n${BLUE} Unknown option '$RE_INSTALL_PYTHON_CONFIRMED' ${RESET}\n"
+        exit 1
+    fi
+}
+
+
+setup() {
+
+    local START_TIME_IN_SECONDS=$(date +%s)
+    # #
+    # # Function calls
+
+    # if [ "$RE_INSTALL_PYTHON" = "true" ]; then
+    #     printf "\n\n${RED}${BOLD}➤ ${BLUE} Removing the Existing Python ${RESET}\n"
+    #     reinstall_python
+    # fi
+
+    # printf "\n\n${RED}${BOLD}➤ ${BLUE} Setting Up the pre Build configurations${RESET}\n"
+    # pre_build_setups
+
+    printf "\n\n${RED}${BOLD}➤ ${BLUE} Setting Up the Python Environment${RESET}\n"
+    install_python
+
+    printf "\n\n${RED}${BOLD}➤ ${BLUE} Installing Python third-party packages${RESET}\n"
+    install_python_third_party_packages
+
+    printf "\n\n${RED}${BOLD}➤ ${BLUE} Setting Up the Python Custom configurations${RESET}\n"
+    python_custom_setups
+
+    # printf "\n\n${RED}${BOLD}➤ ${BLUE} Setting Up the AWS CLI tools${RESET}\n"
+    # install_aws_cli
+
+    # printf "\n\n${RED}${BOLD}➤ ${BLUE} Setting Up the post Build configurations${RESET}\n"
+    # post_build_setups
+
+    local END_TIME_IN_SECONDS=$(date +%s)
+    local RUNTIME=$((END_TIME_IN_SECONDS-START_TIME_IN_SECONDS))
+    printf "\n\n${BLUE}➤➤➤ Build Succeeded in:${BOLD} ($(format_time_hh_mm_ss $RUNTIME)) ${RESET}\n\n"
+}
+
+# Run the setup function and handle any errors
+setup "$@" || error_handler $LINENO
