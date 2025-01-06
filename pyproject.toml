@@ -5,7 +5,7 @@ description = ""
 authors = ["CnSiva <sivacn@btclabs.cloud>"]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.12"
 botorch = "^0.12"
 
 [tool.poetry.dev-dependencies]

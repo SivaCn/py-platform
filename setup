@@ -213,6 +213,11 @@ install_python() {
         CMD="wget $PYTHON_SOURCE_PATH -O deps/$PYTHON_TAR"
         execute_cmd "${CMD}" "Downloading Python-${PYTHON_VERSION}"
 
+        if [ ! -f "${DEP_DIR}/${PYTHON_TAR}" ]; then
+            execute_cmd "" "${RED}Failed to download Python: (${GREEN}${CMD}${RED})${RESET}"
+            exit 1
+        fi
+
         CMD="tar -xJf ${DEP_DIR}/${PYTHON_TAR} --directory=${DEP_DIR}"
         execute_cmd "${CMD}" "Extracting Python-${PYTHON_VERSION}"
 
@@ -223,7 +228,7 @@ install_python() {
 
         N_PROC=$(nproc)
         CMD="make -j ${N_PROC}"
-	execute_cmd "${CMD}" "Compiling ${RED}(Threads: ${N_PROC})${RESET}"
+	    execute_cmd "${CMD}" "Compiling ${RED}(Threads: ${N_PROC})${RESET}"
 
         CMD="make install"
         execute_cmd "${CMD}" "Installing"
