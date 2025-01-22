@@ -6,13 +6,6 @@ authors = ["CnSiva <sivacn@btclabs.cloud>"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-botorch = "^0.12"
-
-[tool.poetry.dev-dependencies]
-pytest = "7.4.2"
-pytest-cov = "4.1.0"
-pytest-html = "4.1.1"
-
 
 [build-system]
 requires = ["poetry"]
